@@ -1,16 +1,20 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.bot import bot_router
-from src.services.bots import bots_service
-from src.utils.settings import settings
+from src.services import bots_service
+from src.utils import settings, init_db, validate_api_key
+from src.models import ALL_DB_MODELS
+from src.routers import ALL_ROUTERS
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
+    await init_db(ALL_DB_MODELS)
+    
     BASE_URL = settings.API_URL
 
     bots = bots_service.get_bots()
@@ -30,6 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(bot_router)
+for router in ALL_ROUTERS:
+    app.include_router(router, prefix="/api", dependencies=[Security(validate_api_key)])
 
 
 @app.get("/", include_in_schema=False)

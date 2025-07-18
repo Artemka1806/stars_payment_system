@@ -2,9 +2,9 @@ from aiogram import Dispatcher
 from aiogram.types import Update
 from fastapi import APIRouter, HTTPException, Request, status, Header
 
-from src.services.bots import bots_service
+from src.services import bots_service
 from src.bot.handlers import ALL_ROUTERS
-from src.utils.settings import settings
+from src.utils import settings
 
 router = APIRouter(
     prefix="/bot",
@@ -12,7 +12,7 @@ router = APIRouter(
 )
 
 dp = Dispatcher()
-dp.include_router(*ALL_ROUTERS)
+dp.include_routers(*ALL_ROUTERS)
 
 
 @router.post("/{id}/webhook")

@@ -9,4 +9,23 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    depends_on:
+      - mongodb
     restart: unless-stopped
+  
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "8001:27017"
+    volumes:
+      - mongodb-data:/data/db
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    restart: unless-stopped
+
+volumes:
+  mongodb-data:

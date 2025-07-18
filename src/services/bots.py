@@ -2,8 +2,10 @@ import os
 from typing import List, Optional
 
 from aiogram import Bot
+from aiogram.types import LabeledPrice
 
-from src.utils.settings import settings
+from src.schemas import CreatePayment
+from src.utils import settings
 
 
 class BotsService:
@@ -43,5 +45,28 @@ class BotsService:
             if bot.id == bot_id:
                 return bot
         return None
+
+    async def create_payment_link(self, bot_id: int, payment_id: str, payment: CreatePayment) -> str:
+        """Create a payment link for a specific bot."""
+        bot = self.get_bot_by_id(bot_id)
+        if not bot:
+            raise ValueError(f"Bot with ID {bot_id} not found.")
+
+        prices = [LabeledPrice(label=payment.label, amount=payment.amount)]
+
+        return await bot.create_invoice_link(
+            title=payment.title,
+            description=payment.description,
+            currency="XTR",
+            photo_url= payment.photo_url,
+            photo_size=payment.photo_size,
+            photo_width=payment.photo_width,
+            photo_height=payment.photo_height,
+            payload=payment_id,
+            prices=prices,
+        )
+        
+       
+
 
 bots_service = BotsService()

@@ -3,3 +3,4 @@ pydantic-settings==2.10.1
 fastapi==0.116.1
 uvicorn==0.35.0
 aiogram==3.21.0
+beanie==1.30.0

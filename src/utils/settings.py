@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Settings for the application, loaded from environment variables."""
+    MONGO_DB_URI: str = "mongodb://localhost:27017"
+    MONGO_DB_NAME: str = "db"
     API_URL: str = "https://api.example.com"
     API_KEY: SecretStr = SecretStr("example_api_key")
     TELEGRAM_SECRET: SecretStr = SecretStr("example_telegram_secret")
