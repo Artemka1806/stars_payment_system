@@ -1,10 +1,10 @@
 services:
-  stars_payment_system_bot:
+  stars_payment_system:
     build:
       context: .
       dockerfile: Dockerfile
-    image: stars_payment_system_bot:latest
-    container_name: stars_payment_system_bot
+    image: stars_payment_system:latest
+    container_name: stars_payment_system
     ports:
       - "8000:8000"
     env_file:
