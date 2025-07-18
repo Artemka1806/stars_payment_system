@@ -68,7 +68,7 @@ docker-compose up -d --force-recreate --remove-orphans --build
 The application will be available at:
 - **API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
-- **MongoDB**: localhost:8001
+- **MongoDB**: http://localhost:8001
 
 ### Stopping the Application
 
