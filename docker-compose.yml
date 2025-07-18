@@ -1,0 +1,12 @@
+services:
+  stars_payment_system_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stars_payment_system_bot:latest
+    container_name: stars_payment_system_bot
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
