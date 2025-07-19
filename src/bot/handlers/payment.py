@@ -31,7 +31,7 @@ async def success_payment_handler(message: Message, bot: Bot):
         data["created_at"] = data["created_at"].isoformat()
         data["payload"] = payment.payload or {}
         async with ClientSession() as session:
-            async with session.post(payment.webhook, json=data) as response:
+            async with session.post(payment.webhook, json=data, headers={"ngrok-skip-browser-warning": "true"}) as response:
                 if response.status != 200:
                     await message.answer("Error: Failed to notify the webhook.")
                     payment.status = "error"
