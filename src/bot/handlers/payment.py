@@ -29,6 +29,7 @@ async def success_payment_handler(message: Message, bot: Bot):
         data = payment.model_dump()
         data["id"] = str(data["id"])
         data["created_at"] = data["created_at"].isoformat()
+        data["payload"] = payment.payload or {}
         async with ClientSession() as session:
             async with session.post(payment.webhook, json=data) as response:
                 if response.status != 200:
