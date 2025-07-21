@@ -1,11 +1,18 @@
+import logging
+
 from aiogram import Bot, Router, F
 from aiogram.types import Message, PreCheckoutQuery
 from aiohttp import ClientSession
 from beanie import PydanticObjectId
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from src.models import Payment
 
 router = Router()
+
+TOTAL_STARS_EARNED = 0
 
 
 @router.pre_checkout_query()
@@ -41,5 +48,9 @@ async def success_payment_handler(message: Message, bot: Bot):
 
     payment.status = "completed"
     await payment.save()
+
+    global TOTAL_STARS_EARNED
+    TOTAL_STARS_EARNED += message.successful_payment.total_amount
+    logger.info(f"Total stars earned: {TOTAL_STARS_EARNED}")
 
     await message.answer("Payment was successful!\nThank you for your purchase!")
