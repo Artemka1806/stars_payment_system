@@ -1,3 +1,4 @@
+from asyncio import sleep
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Security
@@ -20,7 +21,8 @@ async def lifespan(app: FastAPI):
     bots = bots_service.get_bots()
     for bot in bots:
         await bots_service.set_bot_webhook(bot, f"{BASE_URL}/bot/{bot.id}/webhook", settings.TELEGRAM_SECRET.get_secret_value())
-    
+        await sleep(0.5)
+
     yield
     
     await bots_service.close_bots(bots)
