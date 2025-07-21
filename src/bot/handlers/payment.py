@@ -44,7 +44,7 @@ async def success_payment_handler(message: Message, bot: Bot):
                     payment.status = "error"
                     await payment.save()
                     await bot.refund_star_payment(message.from_user.id, message.successful_payment.telegram_payment_charge_id)
-        await session.close()
+            await session.close()
     
     payment.status = "completed"
     await payment.save()
