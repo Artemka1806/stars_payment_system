@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     bots = bots_service.get_bots()
     for bot in bots:
         await bots_service.set_bot_webhook(bot, f"{BASE_URL}/bot/{bot.id}/webhook", settings.TELEGRAM_SECRET.get_secret_value())
-        await sleep(0.5)
+        await sleep(1)
 
     yield
     
