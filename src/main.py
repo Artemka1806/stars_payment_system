@@ -1,10 +1,15 @@
 from asyncio import sleep
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.bot import bot_router
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from src.services import bots_service
 from src.utils import settings, init_db, validate_api_key
 from src.models import ALL_DB_MODELS
@@ -17,15 +22,19 @@ async def lifespan(app: FastAPI):
     await init_db(ALL_DB_MODELS)
     
     BASE_URL = settings.API_URL
+    
+    bots_service.initialize_bots()
 
-    bots = bots_service.get_bots()
-    for bot in bots:
-        await bots_service.set_bot_webhook(bot, f"{BASE_URL}/bot/{bot.id}/webhook", settings.TELEGRAM_SECRET.get_secret_value())
-        await sleep(1)
+    for bot in bots_service.bots:
+        webhook_url = f"{BASE_URL}/bot/{bot.id}/webhook"
+        secret = settings.TELEGRAM_SECRET.get_secret_value()
+        logger.info(f"Setting webhook for bot {bot.id} to {webhook_url}")
+        await bots_service.set_bot_webhook(bot, webhook_url, secret)
+        await sleep(1) 
 
     yield
     
-    await bots_service.close_bots(bots)
+    await bots_service.close_bots()
 
 app = FastAPI(title="Stars Payment System API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
