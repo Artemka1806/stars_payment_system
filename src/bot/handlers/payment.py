@@ -63,5 +63,7 @@ async def success_payment_handler(message: Message, bot: Bot):
     global TOTAL_STARS_EARNED
     TOTAL_STARS_EARNED += message.successful_payment.total_amount
     logger.info(f"Total stars earned: {TOTAL_STARS_EARNED}")
-
-    await message.answer("Payment was successful!\nThank you for your purchase!")
+    try:
+        await message.answer("Payment was successful!\nThank you for your purchase!")
+    except Exception as e:
+        logger.error("Bot was blocked by user")
