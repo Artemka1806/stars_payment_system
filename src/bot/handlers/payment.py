@@ -32,6 +32,12 @@ async def success_payment_handler(message: Message, bot: Bot):
         await bot.refund_star_payment(message.from_user.id, message.successful_payment.telegram_payment_charge_id)
         return
 
+    if payment.status != "pending":
+        cloned_data = payment.model_dump(exclude={"id", "created_at"})
+        cloned_data["status"] = "pending"
+        payment = Payment(**cloned_data)
+        await payment.insert()
+
     if payment.status == "pending" and payment.webhook:
         data = payment.model_dump()
 
