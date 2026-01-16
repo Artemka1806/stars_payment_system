@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     API_KEY: SecretStr = SecretStr("example_api_key")
     TELEGRAM_SECRET: SecretStr = SecretStr("example_telegram_secret")
     ENV_BOT_TOKEN_PREFIX: str = "BOT_TOKEN_"
+    BOT_TOKEN_ENCRYPTION_KEY: SecretStr = SecretStr("example_fernet_key")
 
     class Config:
         env_file = ".env"

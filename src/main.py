@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     
     BASE_URL = settings.API_URL
     
-    bots_service.initialize_bots()
+    await bots_service.initialize_bots()
 
     for bot in bots_service.bots:
         webhook_url = f"{BASE_URL}/bot/{bot.id}/webhook"
