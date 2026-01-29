@@ -1,4 +1,4 @@
-from asyncio import sleep
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 
@@ -25,15 +25,27 @@ async def lifespan(app: FastAPI):
     
     await bots_service.initialize_bots()
 
-    for bot in bots_service.bots:
-        webhook_url = f"{BASE_URL}/bot/{bot.id}/webhook"
+    async def _set_webhooks_in_background() -> None:
         secret = settings.TELEGRAM_SECRET.get_secret_value()
-        logger.info(f"Setting webhook for bot {bot.id} to {webhook_url}")
-        await bots_service.set_bot_webhook(bot, webhook_url, secret)
-        await sleep(1) 
+        for bot in bots_service.bots:
+            webhook_url = f"{BASE_URL}/bot/{bot.id}/webhook"
+            logger.info("Setting webhook for bot %s to %s", bot.id, webhook_url)
+            try:
+                await bots_service.set_bot_webhook(bot, webhook_url, secret)
+            except Exception:
+                logger.exception("Failed to set webhook for bot %s", bot.id)
+            await asyncio.sleep(1)
+
+    webhook_task = asyncio.create_task(_set_webhooks_in_background())
 
     yield
     
+    if not webhook_task.done():
+        webhook_task.cancel()
+        try:
+            await webhook_task
+        except asyncio.CancelledError:
+            pass
     await bots_service.close_bots()
 
 app = FastAPI(title="Stars Payment System API", version="1.0.0", lifespan=lifespan)
