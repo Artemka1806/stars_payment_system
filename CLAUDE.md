@@ -45,9 +45,12 @@ docker-compose up -d --force-recreate --remove-orphans --build
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Compile check (run after every change)
+python -m compileall src/ -q
 ```
 
-No test framework is configured.
+No test framework is configured. Always run `python -m compileall src/ -q` after making changes to verify everything compiles.
 
 ## Architecture
 
