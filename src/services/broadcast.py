@@ -36,6 +36,15 @@ async def get_unique_user_ids(bot_id: int, filters: Optional[BroadcastFilters] =
     return [doc["_id"] for doc in results if doc["_id"] is not None]
 
 
+async def _send_message(bot: Bot, user_id: int, text: Optional[str], photo_url: Optional[str], video_url: Optional[str]):
+    if video_url:
+        await bot.send_video(user_id, video=video_url, caption=text)
+    elif photo_url:
+        await bot.send_photo(user_id, photo=photo_url, caption=text)
+    else:
+        await bot.send_message(user_id, text=text)
+
+
 async def run_broadcast(
     broadcast_id: str,
     bot: Bot,
@@ -43,6 +52,7 @@ async def run_broadcast(
     user_ids: List[int],
     text: Optional[str],
     photo_url: Optional[str],
+    video_url: Optional[str],
     rc: aioredis.Redis,
 ) -> None:
     stats_key = f"broadcast:{broadcast_id}:stats"
@@ -63,20 +73,14 @@ async def run_broadcast(
             continue
 
         try:
-            if photo_url:
-                await bot.send_photo(user_id, photo=photo_url, caption=text)
-            else:
-                await bot.send_message(user_id, text=text)
+            await _send_message(bot, user_id, text, photo_url, video_url)
             await rc.set(user_key, "ok", ex=BROADCAST_TTL)
             await rc.hincrby(stats_key, "success", 1)
         except TelegramRetryAfter as e:
             logger.warning("Rate limited, sleeping %s seconds", e.retry_after)
             await asyncio.sleep(e.retry_after)
             try:
-                if photo_url:
-                    await bot.send_photo(user_id, photo=photo_url, caption=text)
-                else:
-                    await bot.send_message(user_id, text=text)
+                await _send_message(bot, user_id, text, photo_url, video_url)
                 await rc.set(user_key, "ok", ex=BROADCAST_TTL)
                 await rc.hincrby(stats_key, "success", 1)
             except Exception:
