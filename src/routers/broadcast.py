@@ -37,7 +37,7 @@ async def broadcast_send(body: BroadcastSendRequest):
     broadcast_id = uuid.uuid4().hex
     rc = get_redis()
 
-    asyncio.create_task(run_broadcast(broadcast_id, bot, body.bot_id, user_ids, body.text, body.photo_url, rc))
+    asyncio.create_task(run_broadcast(broadcast_id, bot, body.bot_id, user_ids, body.text, body.photo_url, body.video_url, rc))
 
     return {"broadcast_id": broadcast_id, "user_count": len(user_ids), "message": "Broadcast started"}
 

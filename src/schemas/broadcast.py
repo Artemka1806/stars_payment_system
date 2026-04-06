@@ -17,12 +17,15 @@ class BroadcastPreviewRequest(BaseModel):
 
 class BroadcastSendRequest(BaseModel):
     bot_id: int
-    text: Optional[str] = Field(None, description="Message text")
+    text: Optional[str] = Field(None, description="Text message (sent alone or as caption for photo/video)")
     photo_url: Optional[str] = Field(None, description="Photo URL to send")
+    video_url: Optional[str] = Field(None, description="Video URL to send")
     filters: Optional[BroadcastFilters] = None
 
     @model_validator(mode="after")
-    def check_text_or_photo(self):
-        if not self.text and not self.photo_url:
-            raise ValueError("At least text or photo_url must be provided")
+    def check_content(self):
+        if not self.text and not self.photo_url and not self.video_url:
+            raise ValueError("At least text, photo_url, or video_url must be provided")
+        if self.photo_url and self.video_url:
+            raise ValueError("Cannot send both photo and video in one broadcast")
         return self
