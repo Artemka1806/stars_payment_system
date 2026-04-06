@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
@@ -13,6 +14,8 @@ from src.services.broadcast import (
     run_broadcast,
 )
 from src.utils.redis import get_redis
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/broadcast",
@@ -41,7 +44,14 @@ async def broadcast_send(body: BroadcastSendRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No users found matching filters")
 
     user_ids = [doc["_id"] for doc in user_data]
-    user_langs = await resolve_user_langs(user_data)
+    try:
+        user_langs = await resolve_user_langs(user_data)
+    except Exception:
+        logger.exception("Failed to resolve user languages for broadcast")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to resolve user languages from external MongoDB",
+        )
     try:
         photo, video = prepare_broadcast_media(body.photo_url, body.video_url)
     except ValueError as exc:

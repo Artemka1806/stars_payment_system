@@ -253,10 +253,20 @@ function showResult(html) {
     el.classList.add('visible');
 }
 
+async function readApiResponse(res) {
+    const raw = await res.text();
+    if (!raw) return {};
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return { detail: raw };
+    }
+}
+
 async function preview() {
     try {
         const res = await fetch(`${API_BASE}/broadcast/preview`, { method: 'POST', headers, body: JSON.stringify(getBody(false)) });
-        const data = await res.json();
+        const data = await readApiResponse(res);
         if (!res.ok) { showResult(`<span class="error">${data.detail}</span>`); return; }
         showResult(`Users matching: <strong>${data.user_count}</strong>`);
     } catch (e) {
@@ -270,7 +280,7 @@ async function send() {
     if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
     try {
         const res = await fetch(`${API_BASE}/broadcast/send`, { method: 'POST', headers, body: JSON.stringify(getBody(true)) });
-        const data = await res.json();
+        const data = await readApiResponse(res);
         if (!res.ok) { showResult(`<span class="error">${data.detail}</span>`); return; }
         showResult(`Broadcast started. ID: <code>${data.broadcast_id}</code><br>Total: ${data.user_count}<div class="progress-bar"><div class="progress-fill" id="pbar" style="width:0%"></div></div><div class="stats" id="statsGrid"></div>`);
         pollInterval = setInterval(() => pollStatus(data.broadcast_id), 1000);
