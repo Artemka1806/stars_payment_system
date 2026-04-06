@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     API_KEY: SecretStr = SecretStr("example_api_key")
     TELEGRAM_SECRET: SecretStr = SecretStr("example_telegram_secret")
     REDIS_URL: str = "redis://localhost:6379/0"
+    EXTERNAL_MONGO_URI: str = "mongodb://localhost:27017"
     ENV_BOT_TOKEN_PREFIX: str = "BOT_TOKEN_"
     BOT_TOKEN_ENCRYPTION_KEY: SecretStr = SecretStr("example_fernet_key")
 

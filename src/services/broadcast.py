@@ -1,20 +1,26 @@
 import asyncio
 import logging
-from typing import List, Optional
+import re
+from typing import Dict, List, Optional
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError, TelegramBadRequest
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorClient
 import redis.asyncio as aioredis
 
 from src.models import Payment
-from src.schemas.broadcast import BroadcastFilters
+from src.schemas.broadcast import BroadcastFilters, DEFAULT_LANG
+from src.utils.settings import settings
 
 logger = logging.getLogger(__name__)
 
 BROADCAST_TTL = 86400  # 24 hours
+SUBDOMAIN_RE = re.compile(r"https?://api(\d+)\.")
 
 
-async def get_unique_user_ids(bot_id: int, filters: Optional[BroadcastFilters] = None) -> List[int]:
+async def get_user_data(bot_id: int, filters: Optional[BroadcastFilters] = None) -> List[dict]:
+    """Returns list of {user_id, order_id, webhook} per unique user (latest payment)."""
     match_stage = {
         "bot_id": bot_id,
         "payload.user_id": {"$exists": True, "$ne": None},
@@ -30,10 +36,89 @@ async def get_unique_user_ids(bot_id: int, filters: Optional[BroadcastFilters] =
 
     pipeline = [
         {"$match": match_stage},
-        {"$group": {"_id": "$payload.user_id"}},
+        {"$sort": {"created_at": -1}},
+        {"$group": {
+            "_id": "$payload.user_id",
+            "order_id": {"$first": "$payload.order_id"},
+            "webhook": {"$first": "$webhook"},
+        }},
     ]
     results = await Payment.aggregate(pipeline).to_list()
-    return [doc["_id"] for doc in results if doc["_id"] is not None]
+    return [doc for doc in results if doc["_id"] is not None]
+
+
+async def get_unique_user_ids(bot_id: int, filters: Optional[BroadcastFilters] = None) -> List[int]:
+    data = await get_user_data(bot_id, filters)
+    return [doc["_id"] for doc in data]
+
+
+def _parse_db_name(webhook: Optional[str]) -> Optional[str]:
+    if not webhook:
+        return None
+    m = SUBDOMAIN_RE.match(webhook)
+    if not m:
+        return None
+    return f"sub_data{m.group(1)}"
+
+
+async def _find_lang_in_db(client: AsyncIOMotorClient, db_name: str, order_id: str) -> Optional[str]:
+    try:
+        oid = ObjectId(order_id)
+    except Exception:
+        return None
+    doc = await client[db_name]["payment_order"].find_one({"_id": oid}, {"lang_code": 1})
+    if doc and doc.get("lang_code"):
+        return doc["lang_code"]
+    return None
+
+
+async def _find_lang_fallback(client: AsyncIOMotorClient, order_id: str) -> Optional[str]:
+    try:
+        oid = ObjectId(order_id)
+    except Exception:
+        return None
+    db_names = await client.list_database_names()
+    for db_name in db_names:
+        if not db_name.startswith("sub_data"):
+            continue
+        doc = await client[db_name]["payment_order"].find_one({"_id": oid}, {"lang_code": 1})
+        if doc and doc.get("lang_code"):
+            return doc["lang_code"]
+    return None
+
+
+async def resolve_user_langs(user_data: List[dict]) -> Dict[int, str]:
+    """Resolve lang_code for each user_id. Returns {user_id: lang_code}."""
+    client = AsyncIOMotorClient(settings.EXTERNAL_MONGO_URI)
+    try:
+        result = {}
+        for entry in user_data:
+            user_id = entry["_id"]
+            order_id = entry.get("order_id")
+            webhook = entry.get("webhook")
+
+            if not order_id:
+                result[user_id] = DEFAULT_LANG
+                continue
+
+            lang = None
+            db_name = _parse_db_name(webhook)
+            if db_name:
+                lang = await _find_lang_in_db(client, db_name, order_id)
+
+            if not lang:
+                lang = await _find_lang_fallback(client, order_id)
+
+            result[user_id] = lang if lang in ("uk", "ru", "en") else DEFAULT_LANG
+        return result
+    finally:
+        client.close()
+
+
+def _get_localized_text(texts: Optional[Dict[str, str]], lang: str) -> Optional[str]:
+    if not texts:
+        return None
+    return texts.get(lang, texts.get(DEFAULT_LANG))
 
 
 async def _send_message(bot: Bot, user_id: int, text: Optional[str], photo_url: Optional[str], video_url: Optional[str]):
@@ -50,7 +135,8 @@ async def run_broadcast(
     bot: Bot,
     bot_id: int,
     user_ids: List[int],
-    text: Optional[str],
+    user_langs: Dict[int, str],
+    texts: Optional[Dict[str, str]],
     photo_url: Optional[str],
     video_url: Optional[str],
     rc: aioredis.Redis,
@@ -71,6 +157,9 @@ async def run_broadcast(
         if await rc.exists(user_key):
             await rc.hincrby(stats_key, "processed", 1)
             continue
+
+        lang = user_langs.get(user_id, DEFAULT_LANG)
+        text = _get_localized_text(texts, lang)
 
         try:
             await _send_message(bot, user_id, text, photo_url, video_url)

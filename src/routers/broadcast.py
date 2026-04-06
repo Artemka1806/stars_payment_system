@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from src.schemas.broadcast import BroadcastPreviewRequest, BroadcastSendRequest
 from src.services import bots_service
-from src.services.broadcast import get_unique_user_ids, run_broadcast
+from src.services.broadcast import get_user_data, get_unique_user_ids, resolve_user_langs, run_broadcast
 from src.utils.redis import get_redis
 
 router = APIRouter(
@@ -30,14 +30,20 @@ async def broadcast_send(body: BroadcastSendRequest):
     if not bot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found")
 
-    user_ids = await get_unique_user_ids(body.bot_id, body.filters)
-    if not user_ids:
+    user_data = await get_user_data(body.bot_id, body.filters)
+    if not user_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No users found matching filters")
+
+    user_ids = [doc["_id"] for doc in user_data]
+    user_langs = await resolve_user_langs(user_data)
 
     broadcast_id = uuid.uuid4().hex
     rc = get_redis()
 
-    asyncio.create_task(run_broadcast(broadcast_id, bot, body.bot_id, user_ids, body.text, body.photo_url, body.video_url, rc))
+    asyncio.create_task(run_broadcast(
+        broadcast_id, bot, body.bot_id, user_ids, user_langs,
+        body.text, body.photo_url, body.video_url, rc,
+    ))
 
     return {"broadcast_id": broadcast_id, "user_count": len(user_ids), "message": "Broadcast started"}
 

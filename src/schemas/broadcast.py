@@ -1,7 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field, model_validator
+
+SUPPORTED_LANGS = ("uk", "ru", "en")
+DEFAULT_LANG = "en"
 
 
 class BroadcastFilters(BaseModel):
@@ -17,7 +20,7 @@ class BroadcastPreviewRequest(BaseModel):
 
 class BroadcastSendRequest(BaseModel):
     bot_id: int
-    text: Optional[str] = Field(None, description="Text message (sent alone or as caption for photo/video)")
+    text: Optional[Dict[str, str]] = Field(None, description='Localized text: {"en": "...", "uk": "...", "ru": "..."}')
     photo_url: Optional[str] = Field(None, description="Photo URL to send")
     video_url: Optional[str] = Field(None, description="Video URL to send")
     filters: Optional[BroadcastFilters] = None
@@ -28,4 +31,6 @@ class BroadcastSendRequest(BaseModel):
             raise ValueError("At least text, photo_url, or video_url must be provided")
         if self.photo_url and self.video_url:
             raise ValueError("Cannot send both photo and video in one broadcast")
+        if self.text and DEFAULT_LANG not in self.text:
+            raise ValueError(f"text must include '{DEFAULT_LANG}' as fallback")
         return self
