@@ -21,8 +21,8 @@ class BroadcastPreviewRequest(BaseModel):
 class BroadcastSendRequest(BaseModel):
     bot_id: int
     text: Optional[Dict[str, str]] = Field(None, description='Localized text: {"en": "...", "uk": "...", "ru": "..."}')
-    photo_url: Optional[str] = Field(None, description="Photo URL to send")
-    video_url: Optional[str] = Field(None, description="Video URL to send")
+    photo_url: Optional[str] = Field(None, description="Photo URL or base64 data URL to send")
+    video_url: Optional[str] = Field(None, description="Video URL or base64 data URL to send")
     filters: Optional[BroadcastFilters] = None
 
     @model_validator(mode="after")
