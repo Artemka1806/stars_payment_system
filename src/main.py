@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from src.services import bots_service
-from src.utils import settings, init_db, validate_api_key
+from src.utils import settings, init_db, init_redis, close_redis, validate_api_key
 from src.models import ALL_DB_MODELS
 from src.routers import ALL_ROUTERS
 
@@ -20,7 +20,8 @@ from src.routers import ALL_ROUTERS
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
     await init_db(ALL_DB_MODELS)
-    
+    await init_redis()
+
     BASE_URL = settings.API_URL
     
     await bots_service.initialize_bots()
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
     await bots_service.close_bots()
+    await close_redis()
 
 app = FastAPI(title="Stars Payment System API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
