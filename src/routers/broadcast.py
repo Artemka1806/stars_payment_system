@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from time import perf_counter
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -25,19 +26,36 @@ router = APIRouter(
 
 @router.post("/preview")
 async def broadcast_preview(body: BroadcastPreviewRequest):
+    started_at = perf_counter()
     bot = bots_service.get_bot_by_id(body.bot_id)
     if not bot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found")
 
     user_ids = await get_unique_user_ids(body.bot_id, body.filters)
+    logger.info(
+        "Broadcast preview completed bot=%s users=%s in %.3fs",
+        body.bot_id,
+        len(user_ids),
+        perf_counter() - started_at,
+    )
     return {"bot_id": body.bot_id, "user_count": len(user_ids)}
 
 
 @router.post("/send")
 async def broadcast_send(body: BroadcastSendRequest):
+    started_at = perf_counter()
     bot = bots_service.get_bot_by_id(body.bot_id)
     if not bot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found")
+
+    logger.info(
+        "Broadcast send requested bot=%s has_text=%s has_photo=%s has_video=%s filters=%s",
+        body.bot_id,
+        bool(body.text),
+        bool(body.photo_url),
+        bool(body.video_url),
+        body.filters.model_dump(exclude_none=True) if body.filters else {"status": "completed"},
+    )
 
     user_data = await get_user_data(body.bot_id, body.filters)
     if not user_data:
@@ -58,6 +76,13 @@ async def broadcast_send(body: BroadcastSendRequest):
         body.text, photo, video, rc,
     ))
 
+    logger.info(
+        "Broadcast queued broadcast=%s bot=%s users=%s in %.3fs",
+        broadcast_id,
+        body.bot_id,
+        user_count,
+        perf_counter() - started_at,
+    )
     return {"broadcast_id": broadcast_id, "user_count": user_count, "message": "Broadcast started"}
 
 

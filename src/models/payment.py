@@ -3,6 +3,7 @@ from typing import Dict, Optional
 
 from beanie import Document
 from pydantic.fields import Field
+from pymongo import ASCENDING, DESCENDING, IndexModel
 
 
 class Payment(Document):
@@ -24,3 +25,21 @@ class Payment(Document):
 
     class Settings:
         name = "payments"
+        indexes = [
+            IndexModel(
+                [
+                    ("bot_id", ASCENDING),
+                    ("status", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="payment_broadcast_match_idx",
+            ),
+            IndexModel(
+                [
+                    ("bot_id", ASCENDING),
+                    ("payload.user_id", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="payment_broadcast_user_idx",
+            ),
+        ]
