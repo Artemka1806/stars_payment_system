@@ -215,7 +215,7 @@ async def run_broadcast(
             await rc.hincrby(stats_key, "failed", 1)
 
         await rc.hincrby(stats_key, "processed", 1)
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
 
     await rc.hset(stats_key, "finished", 1)
     logger.info("Broadcast %s finished", broadcast_id)
