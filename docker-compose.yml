@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
   
   mongodb:
-    image: mongo:latest
+    image: mongo:4.4
     container_name: mongodb
     ports:
       - "1489:27017"
