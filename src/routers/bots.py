@@ -10,6 +10,18 @@ router = APIRouter(
 )
 
 
+@router.get("", response_model=dict)
+async def list_bots():
+    bots = []
+    for bot in bots_service.get_bots():
+        try:
+            me = await bot.get_me()
+            bots.append({"id": bot.id, "username": me.username})
+        except Exception:
+            bots.append({"id": bot.id, "username": None})
+    return {"bots": bots}
+
+
 @router.post("", response_model=dict)
 async def create_bot(payload: CreateBot):
     """Create a new bot record."""

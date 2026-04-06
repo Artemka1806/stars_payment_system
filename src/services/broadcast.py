@@ -1,10 +1,14 @@
 import asyncio
+import base64
+import binascii
 import logging
+import mimetypes
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError, TelegramBadRequest
+from aiogram.types import BufferedInputFile
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 import redis.asyncio as aioredis
@@ -17,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 BROADCAST_TTL = 86400  # 24 hours
 SUBDOMAIN_RE = re.compile(r"https?://api(\d+)\.")
+ResolvedMedia = Optional[Union[str, BufferedInputFile]]
 
 
 async def get_user_data(bot_id: int, filters: Optional[BroadcastFilters] = None) -> List[dict]:
@@ -121,11 +126,35 @@ def _get_localized_text(texts: Optional[Dict[str, str]], lang: str) -> Optional[
     return texts.get(lang, texts.get(DEFAULT_LANG))
 
 
-async def _send_message(bot: Bot, user_id: int, text: Optional[str], photo_url: Optional[str], video_url: Optional[str]):
-    if video_url:
-        await bot.send_video(user_id, video=video_url, caption=text)
-    elif photo_url:
-        await bot.send_photo(user_id, photo=photo_url, caption=text)
+def _resolve_media(value: Optional[str]) -> ResolvedMedia:
+    if not value:
+        return None
+    if value.startswith("data:"):
+        try:
+            header, encoded = value.split(",", 1)
+        except ValueError as exc:
+            raise ValueError("Invalid media data URL") from exc
+        if ";base64" not in header:
+            raise ValueError("Only base64 media uploads are supported")
+        mime_type = header[5:].split(";", 1)[0]
+        extension = mimetypes.guess_extension(mime_type) or ".bin"
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except binascii.Error as exc:
+            raise ValueError("Invalid base64 media payload") from exc
+        return BufferedInputFile(data, filename=f"upload{extension}")
+    return value
+
+
+def prepare_broadcast_media(photo_url: Optional[str], video_url: Optional[str]) -> tuple[ResolvedMedia, ResolvedMedia]:
+    return _resolve_media(photo_url), _resolve_media(video_url)
+
+
+async def _send_message(bot: Bot, user_id: int, text: Optional[str], photo: ResolvedMedia, video: ResolvedMedia):
+    if video:
+        await bot.send_video(user_id, video=video, caption=text)
+    elif photo:
+        await bot.send_photo(user_id, photo=photo, caption=text)
     else:
         await bot.send_message(user_id, text=text)
 
@@ -137,8 +166,8 @@ async def run_broadcast(
     user_ids: List[int],
     user_langs: Dict[int, str],
     texts: Optional[Dict[str, str]],
-    photo_url: Optional[str],
-    video_url: Optional[str],
+    photo: ResolvedMedia,
+    video: ResolvedMedia,
     rc: aioredis.Redis,
 ) -> None:
     stats_key = f"broadcast:{broadcast_id}:stats"
@@ -162,14 +191,14 @@ async def run_broadcast(
         text = _get_localized_text(texts, lang)
 
         try:
-            await _send_message(bot, user_id, text, photo_url, video_url)
+            await _send_message(bot, user_id, text, photo, video)
             await rc.set(user_key, "ok", ex=BROADCAST_TTL)
             await rc.hincrby(stats_key, "success", 1)
         except TelegramRetryAfter as e:
             logger.warning("Rate limited, sleeping %s seconds", e.retry_after)
             await asyncio.sleep(e.retry_after)
             try:
-                await _send_message(bot, user_id, text, photo_url, video_url)
+                await _send_message(bot, user_id, text, photo, video)
                 await rc.set(user_key, "ok", ex=BROADCAST_TTL)
                 await rc.hincrby(stats_key, "success", 1)
             except Exception:

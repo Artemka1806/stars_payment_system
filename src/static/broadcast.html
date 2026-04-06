@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Broadcast</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; display: flex; justify-content: center; padding: 40px 16px; }
+.container { width: 100%; max-width: 520px; }
+h1 { font-size: 1.5rem; margin-bottom: 24px; color: #fff; }
+label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px; margin-top: 16px; }
+select, input[type="text"], input[type="datetime-local"], textarea { width: 100%; padding: 10px 12px; border: 1px solid #333; border-radius: 8px; background: #1a1a1a; color: #e0e0e0; font-size: 0.95rem; outline: none; }
+select:focus, input:focus, textarea:focus { border-color: #5b8def; }
+textarea { resize: vertical; min-height: 80px; }
+.tabs { display: flex; gap: 8px; margin-top: 16px; }
+.tab { padding: 6px 14px; border-radius: 6px; background: #1a1a1a; border: 1px solid #333; color: #aaa; cursor: pointer; font-size: 0.85rem; }
+.tab.active { background: #5b8def; color: #fff; border-color: #5b8def; }
+.lang-input { display: none; }
+.lang-input.active { display: block; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.actions { margin-top: 24px; display: flex; gap: 12px; }
+button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; font-weight: 500; }
+.btn-preview { background: #2a2a2a; color: #e0e0e0; }
+.btn-preview:hover { background: #333; }
+.btn-send { background: #5b8def; color: #fff; }
+.btn-send:hover { background: #4a7de0; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.result { margin-top: 20px; padding: 14px; border-radius: 8px; background: #1a1a1a; border: 1px solid #333; font-size: 0.9rem; display: none; }
+.result.visible { display: block; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+.stat { padding: 10px; border-radius: 6px; background: #222; text-align: center; }
+.stat .val { font-size: 1.4rem; font-weight: 600; color: #fff; }
+.stat .lbl { font-size: 0.75rem; color: #888; margin-top: 2px; }
+.progress-bar { height: 6px; background: #333; border-radius: 3px; margin-top: 12px; overflow: hidden; }
+.progress-fill { height: 100%; background: #5b8def; border-radius: 3px; transition: width 0.3s; }
+.error { color: #ef5b5b; }
+.success { color: #5bef8b; }
+.filters-toggle { margin-top: 16px; font-size: 0.85rem; color: #5b8def; cursor: pointer; }
+.filters { display: none; }
+.filters.open { display: block; }
+.media-section { margin-top: 16px; }
+.media-row { display: flex; gap: 12px; align-items: flex-end; margin-top: 4px; }
+.media-row > .field { flex: 1; }
+.media-row > .or { color: #555; font-size: 0.8rem; padding-bottom: 12px; }
+.media-hint { margin-top: 6px; color: #777; font-size: 0.78rem; }
+.file-label { display: inline-block; padding: 8px 14px; border-radius: 8px; background: #2a2a2a; color: #aaa; cursor: pointer; font-size: 0.85rem; border: 1px solid #333; white-space: nowrap; }
+.file-label:hover { background: #333; color: #e0e0e0; }
+.file-label.has-file { border-color: #5b8def; color: #5b8def; }
+input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Broadcast</h1>
+
+    <label for="bot">Bot</label>
+    <select id="bot"><option value="">Loading...</option></select>
+
+    <label>Message text</label>
+    <div class="tabs" id="langTabs">
+        <div class="tab active" data-lang="en">EN</div>
+        <div class="tab" data-lang="uk">UK</div>
+        <div class="tab" data-lang="ru">RU</div>
+    </div>
+    <div class="lang-input active" data-lang="en"><textarea id="text_en" placeholder="English text (required)"></textarea></div>
+    <div class="lang-input" data-lang="uk"><textarea id="text_uk" placeholder="Ukrainian text"></textarea></div>
+    <div class="lang-input" data-lang="ru"><textarea id="text_ru" placeholder="Russian text"></textarea></div>
+
+    <div class="media-section">
+        <label>Photo</label>
+        <div class="media-row">
+            <div class="field"><input type="text" id="photo_url" placeholder="URL"></div>
+            <div class="or">or</div>
+            <div><label class="file-label" id="photo_file_label" for="photo_file">Upload file</label><input type="file" id="photo_file" accept="image/*"></div>
+        </div>
+        <div class="media-hint">File upload is converted to base64 automatically.</div>
+
+        <label>Video</label>
+        <div class="media-row">
+            <div class="field"><input type="text" id="video_url" placeholder="URL"></div>
+            <div class="or">or</div>
+            <div><label class="file-label" id="video_file_label" for="video_file">Upload file</label><input type="file" id="video_file" accept="video/*"></div>
+        </div>
+        <div class="media-hint">Choose either photo or video for one broadcast.</div>
+    </div>
+
+    <div class="filters-toggle" onclick="document.getElementById('filtersBlock').classList.toggle('open')">Filters</div>
+    <div class="filters" id="filtersBlock">
+        <label for="status">Status</label>
+        <input type="text" id="status" value="completed">
+        <div class="row">
+            <div>
+                <label for="date_from">Date from</label>
+                <input type="datetime-local" id="date_from">
+            </div>
+            <div>
+                <label for="date_to">Date to</label>
+                <input type="datetime-local" id="date_to">
+            </div>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn-preview" onclick="preview()">Preview</button>
+        <button class="btn-send" onclick="send()">Send</button>
+    </div>
+
+    <div class="result" id="result"></div>
+</div>
+
+<script>
+const API_BASE = '/api';
+const API_KEY = localStorage.getItem('api_key') || prompt('Enter API key:');
+if (API_KEY) localStorage.setItem('api_key', API_KEY);
+
+const headers = { 'Content-Type': 'application/json', 'X-API-Key': API_KEY };
+
+let photoBase64 = null;
+let videoBase64 = null;
+
+function resetFileInput(fileId, labelId, base64Setter) {
+    document.getElementById(fileId).value = '';
+    base64Setter(null);
+    const label = document.getElementById(labelId);
+    label.textContent = 'Upload file';
+    label.classList.remove('has-file');
+}
+
+function clearMedia(side) {
+    if (side === 'photo') {
+        document.getElementById('photo_url').value = '';
+        resetFileInput('photo_file', 'photo_file_label', v => photoBase64 = v);
+        return;
+    }
+    document.getElementById('video_url').value = '';
+    resetFileInput('video_file', 'video_file_label', v => videoBase64 = v);
+}
+
+function formatBotLabel(bot) {
+    return bot.username ? `@${bot.username} (${bot.id})` : `Bot ID ${bot.id}`;
+}
+
+// Lang tabs
+document.querySelectorAll('#langTabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('#langTabs .tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.lang-input').forEach(li => li.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`.lang-input[data-lang="${tab.dataset.lang}"]`).classList.add('active');
+    });
+});
+
+// File upload handlers
+function setupFileInput(fileId, labelId, urlId, base64Setter) {
+    const fileInput = document.getElementById(fileId);
+    const label = document.getElementById(labelId);
+    const urlInput = document.getElementById(urlId);
+    const side = fileId.startsWith('photo') ? 'photo' : 'video';
+    const oppositeSide = side === 'photo' ? 'video' : 'photo';
+
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) { base64Setter(null); label.textContent = 'Upload file'; label.classList.remove('has-file'); return; }
+        label.textContent = file.name.length > 16 ? file.name.slice(0, 14) + '...' : file.name;
+        label.classList.add('has-file');
+        urlInput.value = '';
+        clearMedia(oppositeSide);
+        const reader = new FileReader();
+        reader.onload = () => base64Setter(reader.result);
+        reader.onerror = () => {
+            base64Setter(null);
+            label.textContent = 'Upload file';
+            label.classList.remove('has-file');
+            showResult('<span class="error">Failed to read the selected file.</span>');
+        };
+        reader.readAsDataURL(file);
+    });
+
+    urlInput.addEventListener('input', () => {
+        if (urlInput.value.trim()) {
+            resetFileInput(fileId, labelId, base64Setter);
+            clearMedia(oppositeSide);
+        }
+    });
+}
+
+setupFileInput('photo_file', 'photo_file_label', 'photo_url', v => photoBase64 = v);
+setupFileInput('video_file', 'video_file_label', 'video_url', v => videoBase64 = v);
+
+async function loadBots() {
+    try {
+        const res = await fetch(`${API_BASE}/bots`, { headers });
+        const data = await res.json();
+        const sel = document.getElementById('bot');
+        if (!res.ok) throw new Error(data.detail || 'Failed to load bots');
+        if (!data.bots.length) {
+            sel.innerHTML = '<option value="">No bots found</option>';
+            return;
+        }
+        sel.innerHTML = data.bots.map(b =>
+            `<option value="${b.id}">${formatBotLabel(b)}</option>`
+        ).join('');
+    } catch (e) {
+        document.getElementById('bot').innerHTML = '<option value="">Failed to load</option>';
+    }
+}
+
+function getBody(includeContent) {
+    const botId = Number(document.getElementById('bot').value);
+    if (!botId) throw new Error('Select a bot first.');
+    const body = { bot_id: botId };
+
+    if (includeContent) {
+        const en = document.getElementById('text_en').value.trim();
+        const uk = document.getElementById('text_uk').value.trim();
+        const ru = document.getElementById('text_ru').value.trim();
+        if (en) {
+            const text = { en };
+            if (uk) text.uk = uk;
+            if (ru) text.ru = ru;
+            body.text = text;
+        }
+
+        const photoUrl = document.getElementById('photo_url').value.trim();
+        const videoUrl = document.getElementById('video_url').value.trim();
+        if ((photoBase64 || photoUrl) && (videoBase64 || videoUrl)) {
+            throw new Error('Choose either photo or video, not both.');
+        }
+        if (photoBase64) body.photo_url = photoBase64;
+        else if (photoUrl) body.photo_url = photoUrl;
+        if (videoBase64) body.video_url = videoBase64;
+        else if (videoUrl) body.video_url = videoUrl;
+    }
+
+    const status = document.getElementById('status').value.trim();
+    const dateFrom = document.getElementById('date_from').value;
+    const dateTo = document.getElementById('date_to').value;
+    if (status !== 'completed' || dateFrom || dateTo) {
+        body.filters = {};
+        if (status) body.filters.status = status;
+        if (dateFrom) body.filters.date_from = new Date(dateFrom).toISOString();
+        if (dateTo) body.filters.date_to = new Date(dateTo).toISOString();
+    }
+
+    return body;
+}
+
+function showResult(html) {
+    const el = document.getElementById('result');
+    el.innerHTML = html;
+    el.classList.add('visible');
+}
+
+async function preview() {
+    try {
+        const res = await fetch(`${API_BASE}/broadcast/preview`, { method: 'POST', headers, body: JSON.stringify(getBody(false)) });
+        const data = await res.json();
+        if (!res.ok) { showResult(`<span class="error">${data.detail}</span>`); return; }
+        showResult(`Users matching: <strong>${data.user_count}</strong>`);
+    } catch (e) {
+        showResult(`<span class="error">${e.message}</span>`);
+    }
+}
+
+let pollInterval = null;
+
+async function send() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    try {
+        const res = await fetch(`${API_BASE}/broadcast/send`, { method: 'POST', headers, body: JSON.stringify(getBody(true)) });
+        const data = await res.json();
+        if (!res.ok) { showResult(`<span class="error">${data.detail}</span>`); return; }
+        showResult(`Broadcast started. ID: <code>${data.broadcast_id}</code><br>Total: ${data.user_count}<div class="progress-bar"><div class="progress-fill" id="pbar" style="width:0%"></div></div><div class="stats" id="statsGrid"></div>`);
+        pollInterval = setInterval(() => pollStatus(data.broadcast_id), 1000);
+    } catch (e) {
+        showResult(`<span class="error">${e.message}</span>`);
+    }
+}
+
+async function pollStatus(id) {
+    try {
+        const res = await fetch(`${API_BASE}/broadcast/${id}/status`, { headers });
+        if (!res.ok) return;
+        const d = await res.json();
+        const pct = d.total > 0 ? Math.round(d.processed / d.total * 100) : 0;
+        const bar = document.getElementById('pbar');
+        if (bar) bar.style.width = pct + '%';
+        const grid = document.getElementById('statsGrid');
+        if (grid) grid.innerHTML = `
+            <div class="stat"><div class="val">${d.total}</div><div class="lbl">Total</div></div>
+            <div class="stat"><div class="val">${d.processed}</div><div class="lbl">Processed</div></div>
+            <div class="stat"><div class="val success">${d.success}</div><div class="lbl">Success</div></div>
+            <div class="stat"><div class="val error">${d.failed}</div><div class="lbl">Failed</div></div>`;
+        if (d.is_finished) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+            if (bar) bar.style.background = '#5bef8b';
+        }
+    } catch {}
+}
+
+loadBots();
+</script>
+</body>
+</html>

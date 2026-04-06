@@ -2,8 +2,11 @@ import asyncio
 from contextlib import asynccontextmanager
 import logging
 
+from pathlib import Path
+
 from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.bot import bot_router
 
@@ -61,6 +64,9 @@ app.add_middleware(
 app.include_router(bot_router)
 for router in ALL_ROUTERS:
     app.include_router(router, prefix="/api", dependencies=[Security(validate_api_key)])
+
+
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 @app.get("/", include_in_schema=False)
