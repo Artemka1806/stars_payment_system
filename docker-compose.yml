@@ -1,5 +1,5 @@
 services:
-  stars_payment_system:
+  Ти:
     build:
       context: .
       dockerfile: Dockerfile
@@ -33,7 +33,10 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
 
 volumes:
   mongodb-data:
+  redis-data:
