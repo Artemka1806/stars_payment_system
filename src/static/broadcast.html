@@ -302,7 +302,8 @@ async function pollStatus(id) {
             <div class="stat"><div class="val">${d.total}</div><div class="lbl">Total</div></div>
             <div class="stat"><div class="val">${d.processed}</div><div class="lbl">Processed</div></div>
             <div class="stat"><div class="val success">${d.success}</div><div class="lbl">Success</div></div>
-            <div class="stat"><div class="val error">${d.failed}</div><div class="lbl">Failed</div></div>`;
+            <div class="stat"><div class="val error">${d.failed}</div><div class="lbl">Failed</div></div>
+            ${d.error ? `<div class="stat" style="grid-column: 1 / -1; text-align:left;"><div class="lbl error" style="font-size:0.85rem; margin-top:0;">${d.error}</div></div>` : ''}`;
         if (d.is_finished) {
             clearInterval(pollInterval);
             pollInterval = null;

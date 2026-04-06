@@ -150,6 +150,31 @@ def prepare_broadcast_media(photo_url: Optional[str], video_url: Optional[str]) 
     return _resolve_media(photo_url), _resolve_media(video_url)
 
 
+async def init_broadcast_stats(broadcast_id: str, total: int, rc: aioredis.Redis) -> None:
+    stats_key = f"broadcast:{broadcast_id}:stats"
+    await rc.hset(stats_key, mapping={
+        "total": total,
+        "processed": 0,
+        "success": 0,
+        "failed": 0,
+        "finished": 0,
+        "error": "",
+    })
+    await rc.expire(stats_key, BROADCAST_TTL)
+
+
+async def mark_broadcast_error(broadcast_id: str, total: int, error: str, rc: aioredis.Redis) -> None:
+    stats_key = f"broadcast:{broadcast_id}:stats"
+    await rc.hset(stats_key, mapping={
+        "total": total,
+        "processed": total,
+        "failed": total,
+        "finished": 1,
+        "error": error,
+    })
+    await rc.expire(stats_key, BROADCAST_TTL)
+
+
 async def _send_message(bot: Bot, user_id: int, text: Optional[str], photo: ResolvedMedia, video: ResolvedMedia):
     if video:
         await bot.send_video(user_id, video=video, caption=text)
@@ -171,14 +196,8 @@ async def run_broadcast(
     rc: aioredis.Redis,
 ) -> None:
     stats_key = f"broadcast:{broadcast_id}:stats"
-    await rc.hset(stats_key, mapping={
-        "total": len(user_ids),
-        "processed": 0,
-        "success": 0,
-        "failed": 0,
-        "finished": 0,
-    })
-    await rc.expire(stats_key, BROADCAST_TTL)
+    if not await rc.exists(stats_key):
+        await init_broadcast_stats(broadcast_id, len(user_ids), rc)
 
     for user_id in user_ids:
         user_key = f"broadcast:{broadcast_id}:{bot_id}:{user_id}"
@@ -219,3 +238,39 @@ async def run_broadcast(
 
     await rc.hset(stats_key, "finished", 1)
     logger.info("Broadcast %s finished", broadcast_id)
+
+
+async def prepare_and_run_broadcast(
+    broadcast_id: str,
+    bot: Bot,
+    bot_id: int,
+    user_data: List[dict],
+    texts: Optional[Dict[str, str]],
+    photo: ResolvedMedia,
+    video: ResolvedMedia,
+    rc: aioredis.Redis,
+) -> None:
+    user_ids = [doc["_id"] for doc in user_data]
+    try:
+        user_langs = await resolve_user_langs(user_data)
+    except Exception:
+        logger.exception("Failed to resolve user languages for broadcast %s", broadcast_id)
+        await mark_broadcast_error(
+            broadcast_id,
+            len(user_ids),
+            "Failed to resolve user languages from external MongoDB",
+            rc,
+        )
+        return
+
+    await run_broadcast(
+        broadcast_id,
+        bot,
+        bot_id,
+        user_ids,
+        user_langs,
+        texts,
+        photo,
+        video,
+        rc,
+    )

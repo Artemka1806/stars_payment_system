@@ -9,9 +9,9 @@ from src.services import bots_service
 from src.services.broadcast import (
     get_user_data,
     get_unique_user_ids,
+    init_broadcast_stats,
     prepare_broadcast_media,
-    resolve_user_langs,
-    run_broadcast,
+    prepare_and_run_broadcast,
 )
 from src.utils.redis import get_redis
 
@@ -43,15 +43,6 @@ async def broadcast_send(body: BroadcastSendRequest):
     if not user_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No users found matching filters")
 
-    user_ids = [doc["_id"] for doc in user_data]
-    try:
-        user_langs = await resolve_user_langs(user_data)
-    except Exception:
-        logger.exception("Failed to resolve user languages for broadcast")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to resolve user languages from external MongoDB",
-        )
     try:
         photo, video = prepare_broadcast_media(body.photo_url, body.video_url)
     except ValueError as exc:
@@ -59,13 +50,15 @@ async def broadcast_send(body: BroadcastSendRequest):
 
     broadcast_id = uuid.uuid4().hex
     rc = get_redis()
+    user_count = len(user_data)
+    await init_broadcast_stats(broadcast_id, user_count, rc)
 
-    asyncio.create_task(run_broadcast(
-        broadcast_id, bot, body.bot_id, user_ids, user_langs,
+    asyncio.create_task(prepare_and_run_broadcast(
+        broadcast_id, bot, body.bot_id, user_data,
         body.text, photo, video, rc,
     ))
 
-    return {"broadcast_id": broadcast_id, "user_count": len(user_ids), "message": "Broadcast started"}
+    return {"broadcast_id": broadcast_id, "user_count": user_count, "message": "Broadcast started"}
 
 
 @router.get("/{broadcast_id}/status")
@@ -82,4 +75,5 @@ async def broadcast_status(broadcast_id: str):
         "success": int(stats.get("success", 0)),
         "failed": int(stats.get("failed", 0)),
         "is_finished": stats.get("finished") == "1",
+        "error": stats.get("error") or None,
     }
