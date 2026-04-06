@@ -4,6 +4,7 @@ from aiogram import Bot, Router, F
 from aiogram.types import Message, PreCheckoutQuery
 from aiohttp import ClientSession
 from beanie import PydanticObjectId
+from bson.errors import InvalidId
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -13,6 +14,25 @@ from src.models import Payment
 router = Router()
 
 TOTAL_STARS_EARNED = 0
+
+
+async def _find_payment(payment_id: str):
+    try:
+        payment = await Payment.get(PydanticObjectId(payment_id))
+        if payment:
+            return payment
+    except (InvalidId, TypeError):
+        pass
+
+    payment = await Payment.find_one({"_id": payment_id})
+    if payment:
+        return payment
+
+    payment = await Payment.find_one({"payload.order_id": payment_id})
+    if payment:
+        return payment
+
+    return await Payment.find_one({"payload.payment_id": payment_id})
 
 
 @router.pre_checkout_query()
@@ -26,8 +46,9 @@ async def success_payment_handler(message: Message, bot: Bot):
     """Handle successful payment."""
     payment_id = message.successful_payment.invoice_payload
 
-    payment = await Payment.get(PydanticObjectId(payment_id))
+    payment = await _find_payment(payment_id)
     if not payment:
+        logger.error("Payment not found for invoice payload %s", payment_id)
         await message.answer("Error: Payment not found.")
         await bot.refund_star_payment(message.from_user.id, message.successful_payment.telegram_payment_charge_id)
         return
